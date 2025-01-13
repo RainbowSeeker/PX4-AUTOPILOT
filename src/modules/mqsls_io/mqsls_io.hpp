@@ -7,9 +7,7 @@
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
-#include <uORB/PublicationMulti.hpp>
-#include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionCallback.hpp>
+#include <uORB/topics/mqsls_share.h>
 
 #include <crc32.h>
 
@@ -92,7 +90,7 @@ namespace unicore // driver for UM982 of unicore
 			pv_type 	vel_type;	// velocity type
 			double 		vel[3];		// vx, vy, vz [m/s]
 			float 		vel_std[3];	// vx, vy, vz std [m/s]
-			uint8_t		stn_id[4];	// station id
+			char		stn_id[4];	// station id
 			float		v_latency;	// velocity latency
 			float		diff_age;	// differential age
 			float		sol_age;	// solution age
@@ -105,12 +103,33 @@ namespace unicore // driver for UM982 of unicore
 		} __attribute__((packed));
 
 		static_assert(sizeof(bestnavxyz) == 112, "sizeof(bestnavxyz) != 112");
+
+		struct uniheading
+		{
+			sol_status 	status;		// solution status
+			pv_type 	pos_type;	// position type
+			float		baseline;	// baseline [m]
+			float		heading;	// heading [deg] [0, 360]
+			float 		pitch;		// pitch [deg] [-90, 90]
+			float 		res;		// reserved
+			float 		heading_std;	// heading std [deg]
+			float 		pitch_std;	// pitch std [deg]
+			char 		stn_id[4];	// station id
+			uint8_t 	sv;		// satellites tracked
+			uint8_t 	sv_in_sol;	// satellites in solution
+			uint8_t 	res1[3];	// reserved
+			ext_sol_status 	ext_sol;	// extended solution status
+			uint8_t 	res2[2];	// reserved
+		} __attribute__((packed));
+
+		static_assert(sizeof(uniheading) == 44, "sizeof(uniheading) != 44");
 	} // namespace msg
 
 	enum msg_id : uint16_t
 	{
 		MSG_ID_BESTNAVXYZ = 240,
 		MSG_ID_BESTNAVXYZH = 242,
+		MSG_ID_UNIHEADING = 972,
 	};
 
 	struct msg_body_binary
@@ -192,7 +211,8 @@ namespace unicore // driver for UM982 of unicore
 				state = PAYLOAD;
 			break;
 		case PAYLOAD:
-			msg.payload[payload_count++] = ch;
+			msg.payload[payload_count] = ch;
+			payload_count++;
 			if (payload_count == msg.header.msg_len)
 				state = CRC_1;
 			break;
@@ -217,12 +237,13 @@ namespace unicore // driver for UM982 of unicore
 
 			reset();
 
-			if (crc == msg.footer.crc) {
-				return 0;
-			} else {
-				PX4_ERR("CRC error");
-				return -EAGAIN;
-			}
+			return 0;
+			// if (crc == msg.footer.crc) {
+			// 	return 0;
+			// } else {
+			// 	PX4_ERR("CRC error");
+			// 	return -EAGAIN;
+			// }
 		}
 		return -EAGAIN;
 	}
@@ -268,6 +289,11 @@ private:
 	int _fd {-1};
 	char _port[20] {};
 	int _baudrate {0};
+
+	// Publication
+	uORB::Publication<mqsls_share_s>	_mqsls_share_pub{ORB_ID(mqsls_share)};
+
+	mqsls_share_s _mqsls_share {};
 };
 
 

@@ -28,6 +28,8 @@ void MqslsIo::Run()
 		return;
 	}
 
+	perf_begin(_loop_perf);
+
 	if (_fd < 0) {
 		_fd = open_serial(_port, _baudrate);
 
@@ -38,6 +40,8 @@ void MqslsIo::Run()
 	}
 
 	collect_data();
+
+	perf_end(_loop_perf);
 }
 
 int MqslsIo::collect_data()
@@ -73,13 +77,37 @@ int MqslsIo::collect_data()
 			case unicore::msg_id::MSG_ID_BESTNAVXYZ:
 			{
 				auto body = reinterpret_cast<unicore::msg::bestnavxyz *>(&_msg.payload);
-				PX4_INFO("BESTNAVXYZ: %f, %f, %f", (double)body->pos[0], (double)body->pos[1], (double)body->pos[2]);
+				_mqsls_share.uav_vel[0] = body->vel[0];
+				_mqsls_share.uav_vel[1] = -body->vel[1];
+				_mqsls_share.uav_vel[2] = -body->vel[2];
+				PX4_INFO("BESTNAVXYZ: %f, %f, %f", _mqsls_share.uav_vel[0], _mqsls_share.uav_vel[1], _mqsls_share.uav_vel[2]);
 				break;
 			}
 			case unicore::msg_id::MSG_ID_BESTNAVXYZH:
 			{
 				auto body = reinterpret_cast<unicore::msg::bestnavxyz *>(&_msg.payload);
-				PX4_INFO("BESTNAVXYZH: %f, %f, %f", (double)body->pos[0], (double)body->pos[1], (double)body->pos[2]);
+				_mqsls_share.load_vel[0] = body->vel[0];
+				_mqsls_share.load_vel[1] = -body->vel[1];
+				_mqsls_share.load_vel[2] = -body->vel[2];
+				PX4_INFO("BESTNAVXYZH: %f, %f, %f", _mqsls_share.load_vel[0], _mqsls_share.load_vel[1], _mqsls_share.load_vel[2]);
+				break;
+			}
+			case unicore::msg_id::MSG_ID_UNIHEADING:
+			{
+				auto body = reinterpret_cast<unicore::msg::uniheading *>(&_msg.payload);
+				float heading_rad = body->heading * M_PI_F / 180.0f;
+				if (heading_rad > M_PI_F) {
+					heading_rad -= 2.f * M_PI_F;
+				}
+				float pitch_rad = body->pitch * M_PI_F / 180.0f;
+				_mqsls_share.delta_pos[0] = cosf(heading_rad) * cosf(pitch_rad) * body->baseline;
+				_mqsls_share.delta_pos[1] = sinf(heading_rad) * cosf(pitch_rad) * body->baseline;
+				_mqsls_share.delta_pos[2] = -sinf(pitch_rad) * body->baseline;
+				_mqsls_share.timestamp = hrt_absolute_time();
+				_mqsls_share_pub.publish(_mqsls_share);
+
+				// PX4_INFO("UNIHEADING: len: %.3f, heading: %.2f, pitch: %.2f", (double)body->baseline, (double)body->heading, (double)body->pitch);
+				// PX4_INFO("UNIHEADING: delta_pos: %.3f, %.3f, %.3f", _mqsls_share.delta_pos[0], _mqsls_share.delta_pos[1], _mqsls_share.delta_pos[2]);
 				break;
 			}
 			default:
@@ -101,7 +129,7 @@ int MqslsIo::collect_data()
 bool MqslsIo::init()
 {
 	// 5ms interval
-	ScheduleOnInterval(1_s);
+	ScheduleOnInterval(5_ms);
 
 	return true;
 }
@@ -109,6 +137,7 @@ bool MqslsIo::init()
 int MqslsIo::print_status()
 {
 	perf_print_counter(_loop_perf);
+	PX4_INFO("Bytes: %" PRIu64 ", Packets: %" PRIu64, _byte_count, _packet_count);
 	return 0;
 }
 
