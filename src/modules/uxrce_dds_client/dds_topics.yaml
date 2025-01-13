@@ -47,8 +47,8 @@ publications:
   - topic: /fmu/out/vehicle_trajectory_waypoint_desired
     type: px4_msgs::msg::VehicleTrajectoryWaypoint
 
-  - topic: /fmu/out/mqsls_share
-    type: px4_msgs::msg::MqslsShare
+  - topic: /fmu/out/follower_send
+    type: px4_msgs::msg::FollowerSend
 
 subscriptions:
 

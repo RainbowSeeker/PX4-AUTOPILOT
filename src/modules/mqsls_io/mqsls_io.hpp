@@ -7,7 +7,9 @@
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
-#include <uORB/topics/mqsls_share.h>
+#include <uORB/Subscription.hpp>
+#include <uORB/topics/follower_send.h>
+#include <uORB/topics/vehicle_local_position.h>
 
 #include <crc32.h>
 
@@ -291,9 +293,13 @@ private:
 	int _baudrate {0};
 
 	// Publication
-	uORB::Publication<mqsls_share_s>	_mqsls_share_pub{ORB_ID(mqsls_share)};
+	uORB::Publication<follower_send_s>	_follower_send_pub{ORB_ID(follower_send)};
 
-	mqsls_share_s _mqsls_share {};
+	// Subscription
+	uORB::Subscription	_vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
+
+	follower_send_s _follower_send {};
+	vehicle_local_position_s _local_pos {};
 };
 
 
