@@ -1,0 +1,12 @@
+menuconfig MODULES_MQSLS_IO
+	bool "mqsls_io"
+	default n
+	---help---
+		Enable support for mqsls_io
+
+menuconfig USER_MQSLS_IO
+	bool "mqsls_io running as userspace module"
+	default n
+	depends on BOARD_PROTECTED && MODULES_MQSLS_IO
+	---help---
+		Put mqsls_io in userspace memory
